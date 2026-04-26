@@ -177,20 +177,55 @@ mkdir -p /home/viko/real-estate-watchdog/backups
 
 No `sudo` needed — everything lives in your home directory and is already owned by `viko`.
 
-### Step 3 — Clone or Transfer the Project to the Server
+### Step 3 — Push to GitHub (from Windows) and Pull on the Server
 
-If the server has internet access to GitHub:
+This is the standard workflow: commit on Windows → push to GitHub → pull on the server. No file copying needed.
 
-```bash
-git clone https://github.com/YOUR_USERNAME/real-estate-watchdog.git /home/viko/real-estate-watchdog/app
-cd /home/viko/real-estate-watchdog/app
-```
+**A. Create the GitHub repository** (one-time setup):
 
-If no internet, copy the project folder via SCP from your Windows machine:
+Go to [github.com/new](https://github.com/new) and create a new **private** repository named `real-estate-watchdog`. Do NOT initialize it with a README (the repo already has files).
+
+**B. Push from your Windows machine** (PowerShell):
 
 ```powershell
-# From Windows PowerShell (adjust the server address)
-scp -r "c:\Users\vtov\git_repos\real-estate-watchdog" viko@YOUR_SERVER:/home/viko/real-estate-watchdog/app
+cd "c:\Users\vtov\git_repos\real-estate-watchdog"
+
+# Connect your local repo to GitHub (replace YOUR_USERNAME)
+git remote add origin https://github.com/YOUR_USERNAME/real-estate-watchdog.git
+
+# Stage everything and make the first commit
+git add .
+git commit -m "Milestone 1: Foundation — Docker, config, DB migrations, async entrypoint"
+
+# Push to GitHub
+git push -u origin main
+```
+
+**C. Clone on the server** (SSH into the server):
+
+```bash
+# Clone the repo into the app directory
+git clone https://github.com/YOUR_USERNAME/real-estate-watchdog.git /home/viko/real-estate-watchdog/app
+
+# Verify
+ls /home/viko/real-estate-watchdog/app/
+# Should show: Dockerfile  Makefile  config/  docker-compose.yml  requirements.txt  src/  ...
+```
+
+**D. For all future changes** — the workflow is always:
+
+```powershell
+# On Windows: commit and push
+git add .
+git commit -m "your message"
+git push
+```
+
+```bash
+# On the server: pull and restart
+cd /home/viko/real-estate-watchdog/app
+git pull
+docker compose restart watchdog   # or 'docker compose up -d --build' if Dockerfile changed
 ```
 
 ### Step 4 — Create the `.env` File (Never Commit This)
@@ -222,34 +257,37 @@ cd /home/viko/real-estate-watchdog/app
 docker compose build
 ```
 
-Watch for any `pip install` errors. If it succeeds, proceed to Step 6.
+Watch for any `pip install` errors. If it succeeds, proceed to Running Milestone 1.
 
-**Option B — PyPI is blocked by VPN on the server (transfer workflow)**:
+**Option B — PyPI is blocked by VPN on the server (build on Windows, transfer only the image)**:
 
-Run the following on your Windows machine (with Docker Desktop installed):
+The project code is already on the server via `git pull`. The only thing you can't do on the server is `pip install` (PyPI blocked). Solution: build the Docker image on your Windows laptop and transfer just the image tarball.
+
+On your Windows machine (with Docker Desktop installed):
 
 ```powershell
 cd "c:\Users\vtov\git_repos\real-estate-watchdog"
 
-# Build the image on your laptop (has open internet)
+# Build the image locally (your laptop has open internet)
 docker build -t real-estate-watchdog:latest .
 
-# Save to a tarball
+# Save it as a compressed tarball
 docker save real-estate-watchdog:latest | gzip > watchdog.tar.gz
 
-# Transfer to the server
-scp watchdog.tar.gz viko@YOUR_SERVER:/home/viko/real-estate-watchdog/
+# Transfer only the image tarball to the server (~200–400 MB)
+scp watchdog.tar.gz viko@YOUR_SERVER:/home/viko/real-estate-watchdog/app/
 ```
 
 Then on the server:
 
 ```bash
-# Load the image (no internet needed)
-docker load < /home/viko/real-estate-watchdog/watchdog.tar.gz
+cd /home/viko/real-estate-watchdog/app
 
-# Edit docker-compose.yml: change the watchdog service to use the loaded image
-# Replace:  build: .
-# With:     image: real-estate-watchdog:latest
+# Load the pre-built image (no internet needed)
+docker load < watchdog.tar.gz
+
+# Edit docker-compose.yml: swap 'build: .' for 'image: real-estate-watchdog:latest'
+nano docker-compose.yml
 ```
 
 ---

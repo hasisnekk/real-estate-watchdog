@@ -41,20 +41,22 @@ status:
 # Use when PyPI is blocked by VPN on the deployment server.
 # Run 'make build-remote' on your laptop (has internet), then transfer + load.
 
-## Instructions for building on an external machine (prints commands to run on laptop)
+## Build image on Windows and transfer to server (only needed when PyPI is VPN-blocked).
+## Code changes always go via: git push (Windows) → git pull (server). Never SCP for code.
 build-remote:
-	@echo "Run these commands on your laptop (not the server):"
+	@echo "Run these commands on your Windows machine (Docker Desktop must be running):"
 	@echo ""
 	@echo "  docker build -t real-estate-watchdog:latest ."
 	@echo "  docker save real-estate-watchdog:latest | gzip > watchdog.tar.gz"
-	@echo "  scp watchdog.tar.gz viko@YOUR_SERVER:/home/viko/real-estate-watchdog/"
+	@echo "  scp watchdog.tar.gz viko@YOUR_SERVER:/home/viko/real-estate-watchdog/app/"
 	@echo ""
-	@echo "Then on the server, run: make load-image"
+	@echo "Then on the server: make load-image"
+	@echo "For code changes: git push on Windows, then git pull on the server."
 
 ## Load a pre-built image tarball (run on the server after 'make build-remote')
 load-image:
-	@echo "Loading image from /home/viko/real-estate-watchdog/watchdog.tar.gz ..."
-	docker load < /home/viko/real-estate-watchdog/watchdog.tar.gz
+	@echo "Loading image from /home/viko/real-estate-watchdog/app/watchdog.tar.gz ..."
+	docker load < /home/viko/real-estate-watchdog/app/watchdog.tar.gz
 	@echo "Done. Edit docker-compose.yml: change 'build: .' to 'image: real-estate-watchdog:latest'"
 
 # ── Data Operations ────────────────────────────────────────────────────────────
