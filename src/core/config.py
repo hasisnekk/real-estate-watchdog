@@ -264,7 +264,12 @@ def _dynaconf_to_plain(obj: Any) -> Any:
     if hasattr(obj, "to_dict"):
         return _dynaconf_to_plain(obj.to_dict())
     if isinstance(obj, dict):
-        return {k.lower(): _dynaconf_to_plain(v) for k, v in obj.items()}
+        # Keys may be floats (e.g. by_effective_rooms: {4.0: 0, 4.5: 20, ...})
+        # — only lowercase string keys, leave numeric keys as-is.
+        return {
+            (k.lower() if isinstance(k, str) else str(k)): _dynaconf_to_plain(v)
+            for k, v in obj.items()
+        }
     if isinstance(obj, list):
         return [_dynaconf_to_plain(i) for i in obj]
     return obj
