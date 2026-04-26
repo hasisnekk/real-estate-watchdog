@@ -1,0 +1,12 @@
+# Development override — volume-mounts src/ so Python changes take effect
+# without rebuilding the image. Just run: docker compose restart watchdog
+#
+# Setup (one-time, on the server only):
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#
+# This file is in .gitignore — never committed. Only used on the server.
+
+services:
+  watchdog:
+    volumes:
+      - ./src:/app/src:ro
