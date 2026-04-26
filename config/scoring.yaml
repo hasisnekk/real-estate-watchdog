@@ -1,0 +1,53 @@
+scoring:
+  price:
+    baseline_nis: 8000
+    penalty_per_50_above_baseline: 1
+    # Exact formula: price_penalty = -floor((price - baseline_nis) / 50)
+    # Applied only when price > baseline_nis. Examples:
+    #   8,050 NIS → floor(50/50)  = 1 → penalty -1
+    #   8,100 NIS → floor(100/50) = 2 → penalty -2
+    #   8,300 NIS → floor(300/50) = 6 → penalty -6
+    #   8,500 NIS → floor(500/50) = 10 → penalty -10
+    soft_reject_above_nis: 8500
+    hard_reject_above_nis: null
+
+  rooms:
+    # effective_rooms = rooms + (0.5 if has_storage else 0)
+    # A 4-room apartment WITHOUT a storage room scores 0 (not penalized, not rewarded).
+    by_effective_rooms:
+      4.0: 0    # 4 rooms, no storage: 0 points
+      4.5: 20   # 4 rooms + storage room, or native 4.5 rooms
+      5.0: 20   # 5 rooms (equivalent value to 4.5 for this search)
+      5.5: 15   # larger than needed — slight downgrade
+    below_4_score: -20
+    above_5_5_score: 10
+
+  amenities:
+    mamad: 10
+    elevator: 10
+    parking: 10
+    balcony: 10
+    garden: 10
+    roof: 10
+    long_term_rental: 10
+
+  building_age:
+    new_threshold_years: 3
+    score_new_verified: 20
+    score_new_estimated: 12
+    score_unknown: 0
+    score_old_verified: -5
+
+  neighborhood:
+    young_family_oriented: 10
+
+  must_have:
+    # Fail-fast: listing is discarded before scoring if any of these are missing.
+    - mamad
+    - elevator
+    - has_images
+    - outdoor_space
+
+  notification:
+    urgent_score_threshold: 60    # send immediately to #urgent-deals
+    normal_score_threshold: 30    # batch to #apartment-listings every 5 min

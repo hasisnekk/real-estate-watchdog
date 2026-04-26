@@ -1,0 +1,180 @@
+search:
+  transaction_type: rent
+
+  budget:
+    preferred_nis: 7500
+    target_nis: 8000
+    soft_max_nis: 8500
+    hard_max_nis: null          # null = no hard price rejection
+
+  rooms:
+    min: 4
+    max: 5.5
+    storage_room_counts_as_half: true
+
+  must_have:
+    mamad: true
+    elevator: true
+    images_required: true       # listings with no images are discarded
+    outdoor_space: true         # at least one of: balcony / garden / roof
+
+  parking:
+    required: false
+    scoring_weight: true        # parking adds to score even if not required
+
+  building:
+    prefer_new: true
+    max_age_years: 3
+    reject_if_unknown: false    # unknown age = score 0, not rejected
+
+  include_agency_listings: true
+  include_private_listings: true
+
+  cities:
+    - name: Petah Tikva
+      neighborhoods:
+        - Em HaMoshavot
+        - Hadar HaMoshavot
+        - Neve Gan
+        - Kfar Ganim
+      tags:
+        - high_supply
+
+    - name: Or Yehuda
+      neighborhoods:
+        - Beit BaPark
+
+    - name: Givat Shmuel
+      tags:
+        - rare_deal_only
+
+    - name: Givatayim
+      tags:
+        - rare_deal_only
+
+    - name: Ramat Gan
+      neighborhoods:
+        - Krinitzi HaHadasha
+        - Ramat Efal
+        - Tel Hashomer
+
+    - name: Hod HaSharon
+      neighborhoods:
+        - Merkaz HaMithadesh
+        - HaGeula
+      tags:
+        - high_quality_population
+        - good_education
+
+    - name: Tel Aviv
+      tags:
+        - rare_deal_only
+
+    - name: Kiryat Ono
+      neighborhoods:
+        - Ono Park
+        - Krinitzi HaHadasha
+        - Psagot Ono
+      tags:
+        - strong_population
+
+  young_neighborhoods:
+    - {city: Petah Tikva, neighborhood: Em HaMoshavot}
+    - {city: Petah Tikva, neighborhood: Hadar HaMoshavot}
+    - {city: Or Yehuda, neighborhood: Beit BaPark}
+    - {city: Kiryat Ono, neighborhood: Ono Park}
+    - {city: Hod HaSharon, neighborhood: HaGeula}
+    - {city: Ramat Gan, neighborhood: Krinitzi HaHadasha}
+
+  # Known new-construction project names (Hebrew). Listings matching these
+  # names get building_age_confidence=estimated without a Nadlan HTTP call.
+  # Add new project names here whenever you manually identify one.
+  known_new_projects:
+    - פסגות אונו
+    - נווה גן חדש
+    - מתחם הריבוע
+    - בית בפארק
+
+  sources:
+    # ── Phase 1 sources (no Apify, no cost) ────────────────────────────────
+
+    - name: csv_seed
+      enabled: false            # set true only for pipeline validation; disabled in production
+      adapter: csv_seed
+      seed_file: data/seed/listings.csv
+      row_delay_seconds: 0.1   # simulate pacing; 0.0 for faster tests
+      schedule: null            # manual trigger only: make run-source source=csv_seed
+      batch_limit: 100          # process all rows in seed file
+
+    - name: komo
+      enabled: true
+      adapter: komo
+      schedule: "*/30 * * * *"  # every 30 minutes
+      jitter_seconds: 60
+      batch_limit: 15
+
+    # ── Phase 2 sources (enable only after Decision Gate in M4) ────────────
+
+    - name: yad2
+      enabled: false
+      adapter: apify_yad2
+      actor_id: swerve/yad2-scraper
+      schedule: "0 */2 * * *"   # every 2 hours
+      jitter_seconds: 300
+      batch_limit: 15
+
+    - name: madlan
+      enabled: false
+      adapter: apify_madlan
+      actor_id: swerve/madlan-scraper
+      schedule: "30 */2 * * *"  # every 2 hours, offset 30 min from yad2
+      jitter_seconds: 300
+      batch_limit: 15
+
+    - name: azorim
+      enabled: false            # enable after confirming rental listings exist
+      adapter: azorim
+      schedule: "0 */6 * * *"   # every 6 hours
+      jitter_seconds: 300
+      batch_limit: 50
+
+    - name: ashtrom
+      enabled: false            # enable after confirming rental listings exist
+      adapter: ashtrom
+      schedule: "0 */6 * * *"
+      jitter_seconds: 300
+      batch_limit: 50
+
+enrichment:
+  enabled: true
+
+  nadlan_gov_il:
+    enabled: true
+    cache_ttl_hours: 168        # 1 week
+
+  govmap:
+    enabled: true
+    cache_ttl_hours: 168
+
+notifications:
+  discord:
+    enabled: true
+    # Webhook URLs are loaded from environment variables (not hardcoded here).
+    # Set DISCORD_URGENT_WEBHOOK_URL etc. in .env
+    urgent_webhook_url: null
+    normal_webhook_url: null
+    error_webhook_url: null
+    batch_delay_seconds: 300    # batch normal notifications every 5 minutes
+    max_images_in_embed: 3
+
+  notify_on_events:
+    - first_seen
+    - price_dropped
+    - images_added
+    - returned_to_market
+    - enrichment_updated_score
+
+persistence:
+  save_raw_payload: true        # store full raw adapter JSON in listings.raw_payload
+  store_image_urls: true
+  download_images: false        # no local image download in MVP

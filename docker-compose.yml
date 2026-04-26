@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-watchdog}
+      POSTGRES_USER: ${POSTGRES_USER:-watchdog}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
+    volumes:
+      - /home/viko/real-estate-watchdog/postgres/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-watchdog}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Exposed only on localhost — not accessible from outside the host
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  # ── Redis 7 ───────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # RDB snapshot every 60 seconds if at least 1 key changed
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - /home/viko/real-estate-watchdog/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Python Watchdog App ───────────────────────────────────────────────────
+  watchdog:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Load all secrets from .env file
+    env_file:
+      - .env
+    volumes:
+      # Persistent runtime directories
+      - /home/viko/real-estate-watchdog/spool:/app/data/spool
+      - /home/viko/real-estate-watchdog/logs:/app/data/logs
+      # Config is read-only (rebuild image or restart to pick up changes)
+      - ./config:/app/config:ro
+    environment:
+      # Constructed from .env variables — watchdog uses DATABASE_URL directly
+      DATABASE_URL: postgresql://${POSTGRES_USER:-watchdog}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-watchdog}
+      REDIS_URL: redis://redis:6379/0
+      # Log level override (set to DEBUG for development)
+      LOG_LEVEL: ${LOG_LEVEL:-info}
